@@ -1,0 +1,35 @@
+# Core RAG dependencies
+pypdf==5.1.0
+python-docx==1.1.2
+sentence-transformers==3.3.1
+chromadb==0.6.3
+rank-bm25==0.2.2
+numpy<2.0
+
+# Knowledge graph
+networkx==3.2.1
+
+# Database
+sqlalchemy==2.0.23
+alembic==1.13.1
+
+# API
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+pydantic==2.5.3
+python-multipart==0.0.6
+
+# Data science & visualization (optional, for analytics)
+pandas==2.1.4
+matplotlib==3.8.2
+seaborn==0.13.1
+
+# LLM integration
+openai>=1.0.0
+google-genai>=1.0.0
+httpx<0.28
+
+# Utilities
+python-dotenv==1.0.0
+openpyxl>=3.1.0
+pyyaml==6.0.1

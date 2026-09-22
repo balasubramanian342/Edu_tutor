@@ -1,0 +1,26 @@
+.env
+.env.*
+!.env.example
+
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Generated RAG indexes
+data/index/*
+!data/index/.gitkeep
+
+# Generated processed data
+data/processed/*
+!data/processed/.gitkeep
+
+# Local database
+*.db
+*.sqlite
+*.sqlite3
+
+# IDE / OS files
+.vscode/
+.idea/
+.DS_Store

@@ -1,0 +1,1582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>RAG Tutor — Adaptive Learning System</title>
+<style>
+/* ── Reset & Base ─────────────────────────────────────── */
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#0f1117;color:#e2e8f0;min-height:100vh}
+a{color:inherit;text-decoration:none}
+button{cursor:pointer;font-family:inherit}
+
+/* ── Layout ───────────────────────────────────────────── */
+#app{display:flex;height:100vh;overflow:hidden}
+#sidebar{width:220px;min-width:220px;background:#1a1d27;border-right:1px solid #2d3148;display:flex;flex-direction:column;transition:width .2s}
+#main{flex:1;overflow-y:auto;display:flex;flex-direction:column}
+
+/* ── Sidebar ──────────────────────────────────────────── */
+.sidebar-header{padding:20px 16px 12px;border-bottom:1px solid #2d3148}
+.sidebar-header h1{font-size:16px;font-weight:700;color:#818cf8;letter-spacing:.5px}
+.sidebar-header p{font-size:11px;color:#64748b;margin-top:3px}
+.sidebar-section{padding:12px 8px 4px;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#475569;font-weight:600}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;margin:2px 6px;font-size:13px;color:#94a3b8;cursor:pointer;transition:all .15s;border:none;background:none;width:calc(100% - 12px);text-align:left}
+.nav-item:hover{background:#252840;color:#e2e8f0}
+.nav-item.active{background:#312e81;color:#a5b4fc;font-weight:600}
+.nav-item .icon{font-size:16px;width:20px;text-align:center}
+
+.student-selector{padding:10px 8px;border-top:1px solid #2d3148;margin-top:auto}
+.student-selector label{font-size:11px;color:#64748b;display:block;margin-bottom:5px;padding-left:4px}
+.student-selector select{width:100%;background:#252840;border:1px solid #374151;border-radius:6px;color:#e2e8f0;padding:7px 10px;font-size:12px;outline:none}
+.student-selector select:focus{border-color:#818cf8}
+
+/* ── Topbar ───────────────────────────────────────────── */
+#topbar{background:#1a1d27;border-bottom:1px solid #2d3148;padding:12px 24px;display:flex;align-items:center;gap:16px;flex-shrink:0}
+#topbar h2{font-size:17px;font-weight:600;flex:1}
+.badge{padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600}
+.badge-blue{background:#1e3a5f;color:#60a5fa}
+.badge-green{background:#14532d;color:#4ade80}
+.badge-purple{background:#3b0764;color:#c084fc}
+.badge-yellow{background:#713f12;color:#fbbf24}
+.badge-red{background:#7f1d1d;color:#f87171}
+
+/* ── Content area ─────────────────────────────────────── */
+#content{padding:24px;flex:1}
+.view{display:none}
+.view.active{display:block}
+
+/* ── Cards ────────────────────────────────────────────── */
+.card{background:#1a1d27;border:1px solid #2d3148;border-radius:12px;padding:20px;margin-bottom:16px}
+.card-title{font-size:13px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;margin-bottom:16px}
+.card-grid{display:grid;gap:16px}
+.card-grid-2{grid-template-columns:repeat(2,1fr)}
+.card-grid-3{grid-template-columns:repeat(3,1fr)}
+.card-grid-4{grid-template-columns:repeat(4,1fr)}
+@media(max-width:900px){.card-grid-4,.card-grid-3,.card-grid-2{grid-template-columns:1fr 1fr}}
+@media(max-width:600px){.card-grid-4,.card-grid-3,.card-grid-2{grid-template-columns:1fr}}
+
+/* ── Stat tiles ───────────────────────────────────────── */
+.stat-tile{background:#252840;border-radius:10px;padding:16px;text-align:center}
+.stat-tile .val{font-size:28px;font-weight:700;color:#a5b4fc;line-height:1}
+.stat-tile .lbl{font-size:11px;color:#64748b;margin-top:5px}
+.stat-tile .sub{font-size:11px;color:#94a3b8;margin-top:3px}
+
+/* ── Progress bar ─────────────────────────────────────── */
+.prog-wrap{margin:6px 0}
+.prog-label{display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;color:#94a3b8}
+.prog-bar{height:8px;background:#1e2235;border-radius:4px;overflow:hidden}
+.prog-fill{height:100%;border-radius:4px;transition:width .5s ease}
+.prog-fill.green{background:linear-gradient(90deg,#22c55e,#4ade80)}
+.prog-fill.blue{background:linear-gradient(90deg,#3b82f6,#60a5fa)}
+.prog-fill.purple{background:linear-gradient(90deg,#8b5cf6,#a78bfa)}
+.prog-fill.yellow{background:linear-gradient(90deg,#f59e0b,#fbbf24)}
+.prog-fill.red{background:linear-gradient(90deg,#ef4444,#f87171)}
+
+/* ── Mastery color helper ─────────────────────────────── */
+.m-mastered{color:#4ade80}.m-proficient{color:#60a5fa}
+.m-approaching{color:#fbbf24}.m-developing{color:#f97316}
+.m-introduced{color:#f87171}.m-not_started{color:#64748b}
+
+/* ── Concept pills ────────────────────────────────────── */
+.concept-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px}
+.concept-pill{background:#252840;border-radius:8px;padding:12px 14px;border-left:3px solid #374151;cursor:pointer;transition:all .15s}
+.concept-pill:hover{background:#2d3154;transform:translateY(-1px)}
+.concept-pill .cp-name{font-size:13px;font-weight:600;margin-bottom:4px}
+.concept-pill .cp-meta{font-size:11px;color:#64748b;display:flex;gap:6px;align-items:center}
+.concept-pill .cp-bar{height:4px;border-radius:2px;background:#1e2235;margin-top:8px;overflow:hidden}
+.concept-pill .cp-fill{height:100%;border-radius:2px}
+.diff-easy{color:#4ade80}.diff-medium{color:#fbbf24}.diff-hard{color:#f87171}
+.border-mastered{border-color:#4ade80}.border-proficient{border-color:#60a5fa}
+.border-approaching{border-color:#fbbf24}.border-developing{border-color:#f97316}
+.border-introduced,.border-not_started{border-color:#374151}
+
+/* ── Chat / Ask ───────────────────────────────────────── */
+#chat-box{background:#252840;border-radius:10px;padding:16px;min-height:200px;max-height:380px;overflow-y:auto;margin-bottom:12px;display:flex;flex-direction:column;gap:10px}
+.msg{padding:10px 14px;border-radius:10px;font-size:13px;line-height:1.6;max-width:90%;white-space:pre-wrap}
+.msg-user{background:#312e81;align-self:flex-end;color:#c7d2fe;border-bottom-right-radius:2px}
+.msg-system{background:#1e2235;align-self:flex-start;color:#e2e8f0;border-bottom-left-radius:2px}
+.msg-system .src{font-size:11px;color:#64748b;margin-top:6px;border-top:1px solid #2d3148;padding-top:6px}
+.chat-input-row{display:flex;gap:8px}
+.chat-input-row input{flex:1;background:#252840;border:1px solid #374151;border-radius:8px;color:#e2e8f0;padding:10px 14px;font-size:13px;outline:none}
+.chat-input-row input:focus{border-color:#818cf8}
+.chat-input-row select{background:#252840;border:1px solid #374151;border-radius:8px;color:#e2e8f0;padding:10px;font-size:13px;outline:none}
+
+/* ── Quiz ─────────────────────────────────────────────── */
+#quiz-box{background:#252840;border-radius:10px;padding:20px}
+.quiz-prompt{font-size:15px;font-weight:500;margin-bottom:16px;line-height:1.5}
+.quiz-options{display:flex;flex-direction:column;gap:8px}
+.opt-btn{background:#1e2235;border:1px solid #374151;border-radius:8px;color:#e2e8f0;padding:10px 14px;font-size:13px;text-align:left;transition:all .15s}
+.opt-btn:hover{background:#2d3154;border-color:#818cf8}
+.opt-btn.correct{background:#14532d;border-color:#4ade80;color:#4ade80}
+.opt-btn.wrong{background:#7f1d1d;border-color:#f87171;color:#f87171}
+.quiz-meta{display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap}
+.quiz-feedback{margin-top:12px;padding:10px 14px;border-radius:8px;font-size:13px}
+.fb-correct{background:#14532d;color:#4ade80}.fb-wrong{background:#7f1d1d;color:#f87171}
+.quiz-progress{font-size:12px;color:#64748b;margin-bottom:12px}
+
+/* ── Knowledge graph ──────────────────────────────────── */
+#kg-canvas{width:100%;height:420px;background:#252840;border-radius:10px;overflow:hidden;position:relative}
+.kg-node{position:absolute;border-radius:8px;padding:8px 12px;font-size:11px;font-weight:600;cursor:pointer;transition:all .2s;border:2px solid transparent;text-align:center;min-width:80px}
+.kg-node:hover{transform:scale(1.05);z-index:10}
+.kg-svg{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none}
+
+/* ── Teacher table ────────────────────────────────────── */
+.data-table{width:100%;border-collapse:collapse;font-size:13px}
+.data-table th{background:#252840;color:#94a3b8;font-weight:600;padding:10px 12px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.5px}
+.data-table td{padding:10px 12px;border-bottom:1px solid #1e2235;color:#e2e8f0}
+.data-table tr:last-child td{border-bottom:none}
+.data-table tr:hover td{background:#1e2235}
+
+/* ── Buttons ──────────────────────────────────────────── */
+.btn{padding:9px 18px;border-radius:8px;font-size:13px;font-weight:600;border:none;transition:all .15s}
+.btn-primary{background:#4338ca;color:#fff}.btn-primary:hover{background:#5046e5}
+.btn-secondary{background:#252840;color:#94a3b8;border:1px solid #374151}.btn-secondary:hover{background:#2d3154;color:#e2e8f0}
+.btn-success{background:#15803d;color:#fff}.btn-success:hover{background:#16a34a}
+.btn-sm{padding:5px 12px;font-size:12px}
+.btn-row{display:flex;gap:8px;flex-wrap:wrap}
+
+/* ── Alert / toast ────────────────────────────────────── */
+.alert{padding:12px 16px;border-radius:8px;font-size:13px;margin-bottom:12px}
+.alert-info{background:#1e3a5f;color:#93c5fd;border:1px solid #1e40af}
+.alert-success{background:#14532d;color:#86efac;border:1px solid #166534}
+.alert-warn{background:#713f12;color:#fde68a;border:1px solid #92400e}
+#toast{position:fixed;bottom:24px;right:24px;background:#312e81;color:#c7d2fe;padding:12px 20px;border-radius:10px;font-size:13px;box-shadow:0 4px 20px rgba(0,0,0,.5);opacity:0;transition:opacity .3s;z-index:999;pointer-events:none}
+
+/* ── Enroll form ──────────────────────────────────────── */
+.form-row{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}
+.form-row label{font-size:12px;color:#94a3b8;font-weight:600}
+.form-row input,.form-row select{background:#252840;border:1px solid #374151;border-radius:8px;color:#e2e8f0;padding:9px 12px;font-size:13px;outline:none}
+.form-row input:focus,.form-row select:focus{border-color:#818cf8}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+
+/* ── Gap analysis ─────────────────────────────────────── */
+.gap-item{background:#252840;border-radius:8px;padding:12px 14px;margin-bottom:8px;border-left:3px solid #374151}
+.gap-item.sev-high{border-color:#f87171}.gap-item.sev-med{border-color:#fbbf24}.gap-item.sev-low{border-color:#60a5fa}
+.gap-item .gap-title{font-size:13px;font-weight:600;margin-bottom:4px}
+.gap-item .gap-meta{font-size:11px;color:#64748b;display:flex;gap:10px}
+
+/* ── Loading spinner ──────────────────────────────────── */
+.spin{display:inline-block;width:14px;height:14px;border:2px solid #374151;border-top-color:#818cf8;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-left:6px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── Scrollbar ────────────────────────────────────────── */
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:#1a1d27}
+::-webkit-scrollbar-thumb{background:#374151;border-radius:3px}
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- ── SIDEBAR ───────────────────────────────────────── -->
+<div id="sidebar">
+  <div class="sidebar-header">
+    <h1>🎓 RAG Tutor</h1>
+    <p>Adaptive Learning System</p>
+  </div>
+
+  <div class="sidebar-section">Student</div>
+  <button class="nav-item active" onclick="nav('overview')" id="nav-overview">
+    <span class="icon">📊</span> Overview
+  </button>
+  <button class="nav-item" onclick="nav('tutor')" id="nav-tutor">
+    <span class="icon">💬</span> Ask Tutor
+  </button>
+  <button class="nav-item" onclick="nav('quiz')" id="nav-quiz">
+    <span class="icon">📝</span> Practice Quiz
+  </button>
+  <button class="nav-item" onclick="nav('concepts')" id="nav-concepts">
+    <span class="icon">📚</span> My Concepts
+  </button>
+  <button class="nav-item" onclick="nav('gaps')" id="nav-gaps">
+    <span class="icon">🔍</span> Gap Analysis
+  </button>
+  <button class="nav-item" onclick="nav('path')" id="nav-path">
+    <span class="icon">🗺️</span> Learning Path
+  </button>
+
+  <div class="sidebar-section">Teacher</div>
+  <button class="nav-item" onclick="nav('teacher')" id="nav-teacher">
+    <span class="icon">🏫</span> Class View
+  </button>
+  <button class="nav-item" onclick="nav('interventions')" id="nav-interventions">
+    <span class="icon">🚨</span> Interventions
+  </button>
+  <button class="nav-item" onclick="nav('graph')" id="nav-graph">
+    <span class="icon">🕸️</span> Knowledge Graph
+  </button>
+  <button class="nav-item" onclick="nav('enroll')" id="nav-enroll">
+    <span class="icon">➕</span> Enroll Student
+  </button>
+  <button class="nav-item" onclick="nav('materials')" id="nav-materials">
+    <span class="icon">📄</span> Course Materials
+  </button>
+  <button class="nav-item" onclick="nav('department')" id="nav-department">
+    <span class="icon">🏛️</span> Department Analytics
+  </button>
+
+  <div class="student-selector">
+    <label>Active Student</label>
+    <select id="student-select" onchange="switchStudent(this.value)">
+      <option value="">Loading…</option>
+    </select>
+  </div>
+</div>
+
+<!-- ── MAIN ──────────────────────────────────────────── -->
+<div id="main">
+  <div id="topbar">
+    <h2 id="page-title">Overview</h2>
+    <span id="topbar-student" class="badge badge-blue">—</span>
+    <span id="topbar-mastery" class="badge badge-green">—</span>
+  </div>
+
+  <div id="content">
+
+    <!-- OVERVIEW ──────────────────────────────────────── -->
+    <div id="view-overview" class="view active">
+      <div class="card-grid card-grid-4" id="stat-tiles" style="margin-bottom:16px">
+        <div class="stat-tile"><div class="val" id="s-mastery">—</div><div class="lbl">Overall Mastery</div></div>
+        <div class="stat-tile"><div class="val" id="s-mastered">—</div><div class="lbl">Concepts Mastered</div></div>
+        <div class="stat-tile"><div class="val" id="s-inprogress">—</div><div class="lbl">In Progress</div></div>
+        <div class="stat-tile"><div class="val" id="s-sessions">—</div><div class="lbl">Total Sessions</div></div>
+      </div>
+
+      <div class="card-grid card-grid-2">
+        <div class="card">
+          <div class="card-title">Subject Progress</div>
+          <div id="subject-progress"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Cognitive Profile</div>
+          <div id="cognitive-profile"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">🎯 Next Learning Targets</div>
+        <div id="next-targets"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">📅 Concepts Due for Review</div>
+        <div id="review-due"></div>
+      </div>
+    </div>
+
+    <!-- ASK TUTOR ─────────────────────────────────────── -->
+    <div id="view-tutor" class="view">
+      <div class="card">
+        <div class="card-title">💬 Ask the Adaptive Tutor</div>
+        <div class="alert alert-info" style="margin-bottom:12px">
+          The tutor uses RAG retrieval from your course materials + gap analysis to personalise every answer.
+        </div>
+        <div style="margin-bottom:12px">
+          <label style="font-size:12px;color:#94a3b8;font-weight:600;display:block;margin-bottom:5px">Focus concept (optional)</label>
+          <select id="tutor-concept" style="background:#252840;border:1px solid #374151;border-radius:8px;color:#e2e8f0;padding:9px 12px;font-size:13px;outline:none;width:100%;max-width:340px">
+            <option value="">— Any concept —</option>
+          </select>
+        </div>
+        <div id="chat-box"></div>
+        <div class="chat-input-row">
+          <input id="chat-input" type="text" placeholder="Ask anything about your course… e.g. What is recursion?"
+            onkeydown="if(event.key==='Enter')sendQuestion()"/>
+          <button class="btn btn-primary" onclick="sendQuestion()">Send</button>
+        </div>
+        <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap" id="quick-questions"></div>
+      </div>
+    </div>
+
+    <!-- PRACTICE QUIZ ─────────────────────────────────── -->
+    <div id="view-quiz" class="view">
+      <div class="card">
+        <div class="card-title">📝 Practice &amp; Assessment</div>
+        <div class="btn-row" style="margin-bottom:16px">
+          <button class="btn btn-primary" onclick="startQuiz()">▶ Start Diagnostic Test</button>
+          <button class="btn btn-secondary" onclick="startPractice()">🎯 Single Practice Question</button>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px;padding:12px;background:#1a1d2e;border-radius:8px">
+          <select id="concept-quiz-select" style="background:#252840;border:1px solid #374151;border-radius:6px;color:#e2e8f0;padding:7px 10px;font-size:13px;flex:1">
+            <option value="">Choose a topic to quiz on…</option>
+          </select>
+          <select id="concept-quiz-count" style="background:#252840;border:1px solid #374151;border-radius:6px;color:#e2e8f0;padding:7px 10px;font-size:13px">
+            <option value="3">3 questions</option>
+            <option value="5" selected>5 questions</option>
+            <option value="8">8 questions</option>
+          </select>
+          <button class="btn btn-primary" onclick="startConceptQuiz()">🎓 Start Topic Quiz</button>
+        </div>
+        <div id="quiz-status" class="alert alert-info">Choose a mode above to begin.</div>
+        <div id="quiz-box" style="display:none">
+          <div class="quiz-progress" id="quiz-progress"></div>
+          <div class="quiz-meta" id="quiz-meta"></div>
+          <div class="quiz-prompt" id="quiz-prompt"></div>
+          <div class="quiz-options" id="quiz-options"></div>
+          <div class="quiz-feedback" id="quiz-feedback" style="display:none"></div>
+          <div style="margin-top:14px" id="quiz-next-row" style="display:none"></div>
+        </div>
+        <div id="quiz-result" style="display:none"></div>
+      </div>
+    </div>
+
+    <!-- MY CONCEPTS ───────────────────────────────────── -->
+    <div id="view-concepts" class="view">
+      <div class="card">
+        <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+          <span>📚 All Concepts</span>
+          <div style="display:flex;gap:8px">
+            <select id="filter-level" onchange="renderConcepts()" style="background:#252840;border:1px solid #374151;border-radius:6px;color:#e2e8f0;padding:5px 8px;font-size:12px">
+              <option value="">All levels</option>
+              <option>MASTERED</option><option>PROFICIENT</option>
+              <option>APPROACHING</option><option>DEVELOPING</option>
+              <option>INTRODUCED</option><option>NOT_STARTED</option>
+            </select>
+            <select id="filter-unit" onchange="renderConcepts()" style="background:#252840;border:1px solid #374151;border-radius:6px;color:#e2e8f0;padding:5px 8px;font-size:12px">
+              <option value="">All units</option>
+            </select>
+          </div>
+        </div>
+        <div class="concept-grid" id="concepts-grid" style="margin-top:12px"></div>
+      </div>
+    </div>
+
+    <!-- GAP ANALYSIS ──────────────────────────────────── -->
+    <div id="view-gaps" class="view">
+      <div class="card">
+        <div class="card-title">🔍 Knowledge Gap Analysis</div>
+        <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+          <select id="gap-concept-select" style="background:#252840;border:1px solid #374151;border-radius:8px;color:#e2e8f0;padding:9px 12px;font-size:13px;flex:1;min-width:200px">
+            <option value="">— Overall gaps —</option>
+          </select>
+          <button class="btn btn-primary" onclick="loadGaps()">Analyse Gaps</button>
+        </div>
+        <div id="gaps-output"></div>
+      </div>
+    </div>
+
+    <!-- LEARNING PATH ─────────────────────────────────── -->
+    <div id="view-path" class="view">
+      <div class="card">
+        <div class="card-title">🗺️ Learning Path Planner</div>
+        <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+          <select id="path-target-select" style="background:#252840;border:1px solid #374151;border-radius:8px;color:#e2e8f0;padding:9px 12px;font-size:13px;flex:1;min-width:200px">
+            <option value="">Choose target concept…</option>
+          </select>
+          <button class="btn btn-primary" onclick="loadPath()">Plan Path</button>
+        </div>
+        <div id="path-output"></div>
+      </div>
+    </div>
+
+    <!-- TEACHER VIEW ──────────────────────────────────── -->
+    <div id="view-teacher" class="view">
+      <div class="card-grid card-grid-4" id="teacher-stats" style="margin-bottom:16px"></div>
+      <div class="card-grid card-grid-2">
+        <div class="card">
+          <div class="card-title">👥 All Students</div>
+          <table class="data-table" id="class-table">
+            <thead><tr><th>Student</th><th>Mastery</th><th>Mastered</th><th>Status</th></tr></thead>
+            <tbody id="class-tbody"></tbody>
+          </table>
+        </div>
+        <div class="card">
+          <div class="card-title">⚠️ Challenging Concepts</div>
+          <div id="challenging-concepts"></div>
+          <div class="card-title" style="margin-top:20px">✅ Well Understood</div>
+          <div id="well-understood"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- INTERVENTIONS ─────────────────────────────────── -->
+    <div id="view-interventions" class="view">
+      <div class="card">
+        <div class="card-title">🚨 Intervention Recommendations</div>
+        <div id="interventions-output"></div>
+      </div>
+    </div>
+
+    <!-- KNOWLEDGE GRAPH ───────────────────────────────── -->
+    <div id="view-graph" class="view">
+      <div class="card">
+        <div class="card-title">🕸️ Domain Knowledge Graph</div>
+        <div class="alert alert-info" style="margin-bottom:12px;font-size:12px">
+          Nodes = concepts · Arrows = prerequisite relationships · Colour = difficulty
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:10px;font-size:12px;flex-wrap:wrap">
+          <span style="color:#4ade80">● Easy</span>
+          <span style="color:#fbbf24">● Medium</span>
+          <span style="color:#f87171">● Hard</span>
+        </div>
+        <div id="kg-canvas"></div>
+      </div>
+    </div>
+
+    <!-- ENROLL STUDENT ────────────────────────────────── -->
+    <div id="view-enroll" class="view">
+      <div class="card" style="max-width:560px">
+        <div class="card-title">➕ Enroll New Student</div>
+        <form onsubmit="enrollStudent(event)">
+          <div class="form-grid">
+            <div class="form-row">
+              <label>Student ID *</label>
+              <input id="en-id" type="text" placeholder="e.g. s004" required/>
+            </div>
+            <div class="form-row">
+              <label>Full Name *</label>
+              <input id="en-name" type="text" placeholder="e.g. David Kim" required/>
+            </div>
+            <div class="form-row">
+              <label>Email *</label>
+              <input id="en-email" type="email" placeholder="e.g. david@uni.edu" required/>
+            </div>
+            <div class="form-row">
+              <label>Grade Level</label>
+              <input id="en-grade" type="text" placeholder="e.g. Year 1"/>
+            </div>
+            <div class="form-row">
+              <label>Institution</label>
+              <input id="en-institution" type="text" placeholder="e.g. ABC College"/>
+            </div>
+            <div class="form-row">
+              <label>Attendance (%)</label>
+              <input id="en-attendance" type="number" min="0" max="100" step="0.01" placeholder="e.g. 82.5"/>
+            </div>
+          </div>
+          <div class="card-title" style="margin:16px 0 10px">Learning Style Survey</div>
+          <div class="form-grid">
+            <div class="form-row"><label>Visual Score (1-10)</label><input id="en-vis" type="number" min="1" max="10" value="5"/></div>
+            <div class="form-row"><label>Auditory Score (1-10)</label><input id="en-aud" type="number" min="1" max="10" value="5"/></div>
+            <div class="form-row"><label>Reading/Writing Score (1-10)</label><input id="en-rw" type="number" min="1" max="10" value="5"/></div>
+            <div class="form-row"><label>Kinesthetic Score (1-10)</label><input id="en-kin" type="number" min="1" max="10" value="5"/></div>
+            <div class="form-row"><label>Pace Preference</label>
+              <select id="en-pace">
+                <option value="slow">Slow</option>
+                <option value="moderate" selected>Moderate</option>
+                <option value="fast">Fast</option>
+              </select>
+            </div>
+          </div>
+          <button type="submit" class="btn btn-success" style="margin-top:8px">Enroll Student</button>
+        </form>
+        <div id="enroll-result" style="margin-top:14px"></div>
+      </div>
+
+    <!-- INSTITUTION DATASET IMPORT ───────────────────────── -->
+    <div class="card" style="max-width:720px">
+      <div class="card-title">📊 Upload Institution Student Dataset</div>
+      <p style="font-size:12px;color:#64748b;margin-bottom:14px">
+        Import a college/university roster in <strong>CSV, XLSX or XLS</strong> format.
+        Required columns: <strong>student_id, name, email</strong>. Optional columns include
+        marks, attendance, department, class, year/grade and institution.
+        Existing student IDs are skipped.
+      </p>
+      <form onsubmit="importStudentDataset(event)">
+        <div class="form-row">
+          <label>Dataset File *</label>
+          <input id="dataset-file" type="file" accept=".csv,.xlsx,.xls" required/>
+        </div>
+        <div class="form-grid">
+          <div class="form-row">
+            <label>Default Institution (optional)</label>
+            <input id="dataset-institution" type="text" placeholder="Used when the file has no institution column"/>
+          </div>
+          <div class="form-row">
+            <label>Default Department (optional)</label>
+            <input id="dataset-department" type="text" placeholder="Used when the file has no department column"/>
+          </div>
+          <div class="form-row">
+            <label>Default Class/Section (optional)</label>
+            <input id="dataset-class" type="text" placeholder="Used when the file has no class column"/>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary">Upload & Enroll Dataset</button>
+      </form>
+      <div id="dataset-import-result" style="margin-top:14px"></div>
+    </div>
+    </div>
+
+    <!-- COURSE MATERIALS (institution notes) ─────────────── -->
+    <div id="view-materials" class="view">
+      <div class="card" style="max-width:640px">
+        <div class="card-title">📄 Add Institution Notes</div>
+        <p style="font-size:12px;color:#64748b;margin-bottom:14px">
+          Upload PDF, DOCX, TXT or MD course material. It's chunked, tagged with
+          the topic below, and indexed immediately — the RAG tutor cites this
+          content the next time a student asks about that topic.
+        </p>
+        <form onsubmit="uploadMaterial(event)">
+          <div class="form-grid">
+            <div class="form-row">
+              <label>File *</label>
+              <input id="mat-file" type="file" accept=".pdf,.docx,.txt,.md" required/>
+            </div>
+            <div class="form-row">
+              <label>Subject *</label>
+              <input id="mat-subject" type="text" placeholder="e.g. Data Structures" value="Data Structures" required/>
+            </div>
+            <div class="form-row">
+              <label>Unit *</label>
+              <input id="mat-unit" type="text" placeholder="e.g. Unit 4" required/>
+            </div>
+            <div class="form-row">
+              <label>Topic *</label>
+              <input id="mat-topic" type="text" placeholder="e.g. Hash Tables" required/>
+            </div>
+            <div class="form-row">
+              <label>Difficulty</label>
+              <select id="mat-difficulty">
+                <option value="easy">Easy</option>
+                <option value="medium" selected>Medium</option>
+                <option value="hard">Hard</option>
+              </select>
+            </div>
+          </div>
+          <button type="submit" class="btn btn-success" style="margin-top:8px">Upload &amp; Ingest</button>
+        </form>
+        <div id="material-upload-result" style="margin-top:14px"></div>
+      </div>
+
+      <div class="card" style="max-width:640px;margin-top:16px">
+        <div class="card-title">📚 Ingested Materials</div>
+        <div id="materials-list">Loading…</div>
+      </div>
+    </div>
+
+    <!-- DEPARTMENT ANALYTICS ───────────────────────────────── -->
+    <div id="view-department" class="view">
+      <div class="card">
+        <div class="card-title">🏛️ Department Analytics</div>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px">
+          <select id="dept-select" onchange="loadDepartmentDetail()"
+            style="background:#252840;border:1px solid #374151;border-radius:6px;color:#e2e8f0;padding:7px 10px;font-size:13px;flex:1">
+          </select>
+        </div>
+        <div id="dept-summary" class="card-grid card-grid-4"></div>
+      </div>
+
+      <div class="card" style="margin-top:16px">
+        <div class="card-title">📊 Mastery Distribution</div>
+        <div id="dept-distribution" class="card-grid card-grid-4"></div>
+      </div>
+
+      <div class="card" style="margin-top:16px">
+        <div class="card-title">🎯 Weakest Concepts (department-wide)</div>
+        <p style="font-size:12px;color:#64748b;margin-bottom:10px">
+          Sorted weakest-first — these are the topics most worth re-teaching or improving course materials for.
+        </p>
+        <div id="dept-concepts">Select a department above.</div>
+      </div>
+
+      <div class="card" style="margin-top:16px">
+        <div class="card-title">👥 Student Roster</div>
+        <div id="dept-roster"></div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+</div><!-- /app -->
+
+<div id="toast"></div>
+
+<script>
+// ── State ────────────────────────────────────────────────────
+const API = '';   // same origin
+let currentStudent = 'demo_alice';
+let allConcepts    = [];
+let studentConcepts = [];
+let graphData      = null;
+let quizSession    = null;
+let quizQ          = null;
+let quizAnswered   = false;
+let conceptQuizId  = null;
+
+// ── Utility ──────────────────────────────────────────────────
+const $  = id => document.getElementById(id);
+const fmt = n  => typeof n === 'number' ? Math.round(n) : n;
+
+function toast(msg, dur = 2800) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.style.opacity = '1';
+  setTimeout(() => t.style.opacity = '0', dur);
+}
+
+function spin(id, on) {
+  const el = $(id);
+  if (!el) return;
+  const s = el.querySelector('.spin');
+  if (on && !s) el.insertAdjacentHTML('beforeend','<span class="spin"></span>');
+  if (!on && s) s.remove();
+}
+
+async function api(path, opts = {}) {
+  const r = await fetch(API + path, opts);
+  if (!r.ok) {
+    const t = await r.text().catch(() => r.statusText);
+    throw new Error(t);
+  }
+  return r.json();
+}
+
+function masteryColor(level) {
+  const m = { MASTERED:'green', PROFICIENT:'blue', APPROACHING:'yellow',
+              DEVELOPING:'yellow', INTRODUCED:'red', NOT_STARTED:'red' };
+  return m[level] || 'blue';
+}
+function masteryEmoji(level) {
+  const m = { MASTERED:'🏆', PROFICIENT:'⭐', APPROACHING:'📈',
+              DEVELOPING:'🔄', INTRODUCED:'👀', NOT_STARTED:'🆕' };
+  return m[level] || '';
+}
+
+// ── Navigation ───────────────────────────────────────────────
+function nav(page) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+  $('view-' + page).classList.add('active');
+  $('nav-' + page).classList.add('active');
+  const titles = { overview:'Overview', tutor:'Ask Tutor', quiz:'Practice Quiz',
+    concepts:'My Concepts', gaps:'Gap Analysis', path:'Learning Path',
+    teacher:'Teacher — Class View', interventions:'Interventions',
+    graph:'Knowledge Graph', enroll:'Enroll Student', materials:'Course Materials', department:'Department Analytics' };
+  $('page-title').textContent = titles[page] || page;
+
+  if (page === 'overview')       loadOverview();
+  if (page === 'tutor')          loadTutorConcepts();
+  if (page === 'quiz')           loadConceptQuizOptions();
+  if (page === 'concepts')       loadConceptsView();
+  if (page === 'gaps')           loadGapConcepts();
+  if (page === 'path')           loadPathTargets();
+  if (page === 'teacher')        loadTeacher();
+  if (page === 'interventions')  loadInterventions();
+  if (page === 'graph')          loadGraph();
+  if (page === 'materials')      loadMaterials();
+  if (page === 'department')     loadDepartments();
+}
+
+// ── Student switcher ─────────────────────────────────────────
+async function loadStudentList() {
+  try {
+    const data = await api('/api/students/');
+    const sel  = $('student-select');
+    sel.innerHTML = data.map(s =>
+      `<option value="${s.student_id}">${s.name}</option>`
+    ).join('');
+    sel.value = currentStudent;
+    updateTopbar(data.find(s => s.student_id === currentStudent));
+  } catch(e) { console.error(e); }
+}
+
+function switchStudent(id) {
+  if (!id) return;
+  currentStudent = id;
+  nav(document.querySelector('.nav-item.active')?.id?.replace('nav-','') || 'overview');
+  loadStudentList();
+}
+
+function updateTopbar(student) {
+  if (!student) return;
+  $('topbar-student').textContent = student.name || student.student_id;
+  $('topbar-mastery').textContent = `${fmt(student.overall_mastery)}% mastery`;
+}
+
+// ── Overview ─────────────────────────────────────────────────
+async function loadOverview() {
+  try {
+    const [profile, report] = await Promise.all([
+      api(`/api/students/${currentStudent}`),
+      api(`/api/dashboard/student/${currentStudent}`)
+    ]);
+
+    $('s-mastery').textContent    = fmt(profile.overall_mastery) + '%';
+    $('s-mastered').textContent   = profile.concepts_mastered;
+    $('s-inprogress').textContent = profile.concepts_in_progress;
+    $('s-sessions').textContent   = profile.total_sessions;
+
+    // Subject progress
+    const sp = report.subject_progress || {};
+    $('subject-progress').innerHTML = Object.entries(sp).map(([subj, d]) => `
+      <div class="prog-wrap">
+        <div class="prog-label"><span>${subj}</span><span>${fmt(d.average_mastery*100)}%</span></div>
+        <div class="prog-bar"><div class="prog-fill ${masteryColor(d.average_mastery > 0.85 ? 'MASTERED' : d.average_mastery > 0.7 ? 'PROFICIENT' : 'DEVELOPING')}"
+          style="width:${fmt(d.average_mastery*100)}%"></div></div>
+        <div style="font-size:11px;color:#64748b;margin-top:3px">${d.mastered}/${d.total_concepts} concepts mastered</div>
+      </div>`).join('') || '<p style="color:#64748b;font-size:13px">No data yet.</p>';
+
+    // Cognitive profile
+    const cog = profile.cognitive_profile || {};
+    const cogLabels = { working_memory:'Working Memory', processing_speed:'Processing Speed',
+      abstract_reasoning:'Abstract Reasoning', metacognition:'Metacognition', growth_mindset:'Growth Mindset' };
+    $('cognitive-profile').innerHTML = Object.entries(cog).map(([k,v]) => `
+      <div class="prog-wrap">
+        <div class="prog-label"><span>${cogLabels[k]||k}</span><span>${Math.round(v*100)}%</span></div>
+        <div class="prog-bar"><div class="prog-fill purple" style="width:${Math.round(v*100)}%"></div></div>
+      </div>`).join('');
+
+    // Next targets
+    const nt = report.next_learning_targets || [];
+    $('next-targets').innerHTML = nt.length
+      ? nt.map(t => `<span class="badge badge-blue" style="margin:3px;padding:6px 12px;font-size:12px">→ ${t}</span>`).join('')
+      : '<span style="color:#64748b;font-size:13px">All prerequisites met — continue practicing!</span>';
+
+    // Review due
+    const rd = report.concepts_needing_review || [];
+    $('review-due').innerHTML = rd.length
+      ? rd.map(c => `<span class="badge badge-yellow" style="margin:3px;padding:6px 12px;font-size:12px">🔁 ${c}</span>`).join('')
+      : '<span style="color:#64748b;font-size:13px">No reviews due right now.</span>';
+
+    updateTopbar({ name: report.student_name, overall_mastery: report.overall_mastery * 100 });
+  } catch(e) { console.error(e); toast('Error loading overview: ' + e.message); }
+}
+
+// ── Ask Tutor ────────────────────────────────────────────────
+async function loadTutorConcepts() {
+  if (!allConcepts.length) await loadAllConcepts();
+  const sel = $('tutor-concept');
+  sel.innerHTML = '<option value="">— Any concept —</option>' +
+    allConcepts.map(c => `<option value="${c.concept_id}">${c.name}</option>`).join('');
+
+  // Quick question buttons
+  const qq = ['What is recursion?','Explain arrays','What is a stack?',
+               'How does merge sort work?','What is Big O notation?'];
+  $('quick-questions').innerHTML = qq.map(q =>
+    `<button class="btn btn-secondary btn-sm" onclick="quickAsk('${q}')">${q}</button>`
+  ).join('');
+}
+
+function quickAsk(q) {
+  $('chat-input').value = q;
+  sendQuestion();
+}
+
+async function sendQuestion() {
+  const input   = $('chat-input');
+  const concept = $('tutor-concept').value;
+  const q = input.value.trim();
+  if (!q) return;
+
+  appendMsg(q, 'user');
+  input.value = '';
+  appendMsg('Thinking… 🧠', 'system', true);
+
+  try {
+    const body = JSON.stringify({ student_id: currentStudent, question: q, concept_id: concept || null });
+    const data = await api('/api/teaching/ask', {
+      method:'POST', headers:{'Content-Type':'application/json'}, body
+    });
+
+    // Remove thinking bubble
+    const boxes = document.querySelectorAll('#chat-box .msg-system');
+    const last = boxes[boxes.length - 1];
+    if (last && last.dataset.temp) last.remove();
+
+    const gapNote = (data.next_steps && data.next_steps.length)
+      ? `\n\n🎯 *Next: ${data.next_steps[0]}*`
+      : '';
+    const reviewNote = data.requires_human_review
+      ? `\n\n⚠️ *Low confidence — consider checking with your instructor or textbook*`
+      : '';
+    const srcNote = data.sources_used > 0
+      ? `📖 Sources: ${data.sources_used} course material chunk(s) used (confidence: ${Math.round(data.confidence*100)}%) · style: ${data.explanation_style}`
+      : `⚠️ No indexed materials found — add PDFs to data/raw/ for richer answers`;
+
+    appendMsg(data.answer + gapNote + reviewNote, 'system', false, srcNote);
+  } catch(e) {
+    const boxes = document.querySelectorAll('#chat-box .msg-system');
+    const last = boxes[boxes.length - 1];
+    if (last && last.dataset.temp) last.remove();
+    appendMsg('Error: ' + e.message, 'system');
+  }
+}
+
+function appendMsg(text, who, temp = false, src = '') {
+  const box = $('chat-box');
+  const div = document.createElement('div');
+  div.className = 'msg msg-' + who;
+  if (temp) div.dataset.temp = '1';
+  div.textContent = text;
+  if (src) div.innerHTML += `<div class="src">${src}</div>`;
+  box.appendChild(div);
+  box.scrollTop = box.scrollHeight;
+}
+
+// ── Practice Quiz ────────────────────────────────────────────
+async function startQuiz() {
+  $('quiz-box').style.display = 'none';
+  $('quiz-result').style.display = 'none';
+  $('quiz-status').textContent = 'Starting diagnostic test…';
+  $('quiz-status').className = 'alert alert-info';
+  try {
+    const data = await api(`/api/assessment/start?student_id=${currentStudent}`);
+    quizSession = data.session_id;
+    $('quiz-status').style.display = 'none';
+    $('quiz-box').style.display = 'block';
+    showQuestion(data.question, '');
+  } catch(e) { $('quiz-status').textContent = 'Error: ' + e.message; $('quiz-status').className = 'alert alert-warn'; }
+}
+
+async function startPractice() {
+  if (!allConcepts.length) await loadAllConcepts();
+  const concept = allConcepts[Math.floor(Math.random() * allConcepts.length)];
+  try {
+    const data = await api(`/api/assessment/question/${concept.concept_id}?bloom_level=2`);
+    quizSession = null;
+    $('quiz-status').style.display = 'none';
+    $('quiz-box').style.display = 'block';
+    $('quiz-result').style.display = 'none';
+    showQuestion(data, 'Practice: ');
+  } catch(e) { toast('Error: ' + e.message); }
+}
+
+function showQuestion(q, prefix = '') {
+  if (!q) { $('quiz-box').style.display = 'none'; return; }
+  quizQ = q;
+  quizAnswered = false;
+  $('quiz-feedback').style.display = 'none';
+  $('quiz-feedback').className = 'quiz-feedback';
+  $('quiz-next-row').innerHTML = '';
+
+  $('quiz-progress').textContent = prefix + `Concept: ${q.concept_name} · ${q.difficulty} · Bloom L${q.bloom_level}`;
+
+  $('quiz-meta').innerHTML = [
+    `<span class="badge badge-blue">${q.type.replace('_',' ')}</span>`,
+    `<span class="badge badge-${q.difficulty==='easy'?'green':q.difficulty==='medium'?'yellow':'red'}">${q.difficulty}</span>`,
+    `<span class="badge badge-purple">⏱ ${q.estimated_minutes} min</span>`,
+    `<span class="badge badge-blue">${q.points} pt${q.points>1?'s':''}</span>`
+  ].join('');
+
+  $('quiz-prompt').textContent = q.prompt;
+
+  const opts = $('quiz-options');
+  if (q.options && q.options.length) {
+    opts.innerHTML = q.options.map(o =>
+      `<button class="opt-btn" onclick="submitAnswer('${o.replace(/'/g,"\\'")}',this)">${o}</button>`
+    ).join('');
+  } else {
+    opts.innerHTML = `
+      <input id="free-ans" style="background:#1e2235;border:1px solid #374151;border-radius:8px;color:#e2e8f0;
+        padding:9px 12px;font-size:13px;width:100%;outline:none" placeholder="Type your answer…"/>
+      <button class="btn btn-primary" style="margin-top:8px" onclick="submitAnswer($('free-ans').value)">Submit</button>`;
+  }
+
+  if (q.hints && q.hints.length) {
+    opts.insertAdjacentHTML('beforeend',
+      `<button class="btn btn-secondary btn-sm" style="margin-top:8px" onclick="showHint()">💡 Hint</button>
+       <div id="hint-box" style="display:none;margin-top:8px;padding:10px;background:#1e2235;border-radius:8px;
+         font-size:12px;color:#94a3b8">${q.hints[0]}</div>`);
+  }
+}
+
+function showHint() {
+  const h = $('hint-box');
+  if (h) h.style.display = h.style.display === 'none' ? 'block' : 'none';
+}
+
+async function submitAnswer(answer, btn) {
+  if (quizAnswered) return;
+  quizAnswered = true;
+
+  let correct = false;
+  let feedback = '';
+
+  if (quizSession) {
+    try {
+      const data = await api(`/api/assessment/answer?session_id=${quizSession}&answer=${encodeURIComponent(answer)}`, { method: 'POST' });
+      const gr = data.grading;
+      correct  = gr.is_correct;
+      feedback = gr.feedback + (gr.detailed_feedback ? ' ' + gr.detailed_feedback : '');
+
+      if (data.status === 'completed') {
+        showQuizResult(data.final_result);
+        return;
+      }
+
+      $('quiz-next-row').innerHTML =
+        `<button class="btn btn-primary" onclick="showQuestion(${JSON.stringify(data.next_question).replace(/"/g,'&quot;')})">
+          Next Question →</button>
+         <span style="font-size:12px;color:#64748b;margin-left:10px">
+           Ability: ${Math.round(data.ability_estimate*100)}% · Done: ${data.questions_done}</span>`;
+    } catch(e) { feedback = e.message; }
+  } else {
+    // Single practice — client-side check
+    const q = quizQ;
+    correct  = q.options ? answer === q.correct_answer : answer.trim().length > 0;
+    feedback = correct ? 'Correct! Well done.' : `Incorrect. Try reviewing ${q.concept_name}.`;
+    $('quiz-next-row').innerHTML =
+      `<button class="btn btn-secondary" onclick="startPractice()">Another Question</button>`;
+  }
+
+  if (btn) {
+    btn.classList.add(correct ? 'correct' : 'wrong');
+    document.querySelectorAll('.opt-btn').forEach(b => b.disabled = true);
+  }
+
+  const fb = $('quiz-feedback');
+  fb.style.display = 'block';
+  fb.className = 'quiz-feedback ' + (correct ? 'fb-correct' : 'fb-wrong');
+  fb.textContent = (correct ? '✅ ' : '❌ ') + feedback;
+}
+
+function showQuizResult(result) {
+  $('quiz-box').style.display  = 'none';
+  $('quiz-result').style.display = 'block';
+  const pct = Math.round(result.score_percentage);
+  const col = pct >= 80 ? '#4ade80' : pct >= 60 ? '#fbbf24' : '#f87171';
+  $('quiz-result').innerHTML = `
+    <div class="card">
+      <div class="card-title">🎯 Test Complete!</div>
+      <div style="text-align:center;padding:20px 0">
+        <div style="font-size:52px;font-weight:700;color:${col}">${pct}%</div>
+        <div style="color:#64748b;margin-top:4px">${result.correct_answers}/${result.total_questions} correct</div>
+        <div style="margin-top:8px">
+          <span class="badge badge-purple">Ability: ${Math.round(result.ability_estimate*100)}%</span>
+        </div>
+      </div>
+      ${result.strengths.length ? `<div class="card-title" style="margin-top:12px">💪 Strengths</div>
+        <div>${result.strengths.map(s=>`<span class="badge badge-green" style="margin:3px">${s}</span>`).join('')}</div>` : ''}
+      ${result.weaknesses.length ? `<div class="card-title" style="margin-top:12px">📚 Needs Work</div>
+        <div>${result.weaknesses.map(s=>`<span class="badge badge-red" style="margin:3px">${s}</span>`).join('')}</div>` : ''}
+      ${result.recommended_review.length ? `<div class="card-title" style="margin-top:12px">💡 Recommendations</div>
+        <ul style="font-size:13px;color:#94a3b8;padding-left:20px;margin-top:6px">
+          ${result.recommended_review.map(r=>`<li style="margin-bottom:4px">${r}</li>`).join('')}</ul>` : ''}
+      <div class="btn-row" style="margin-top:16px">
+        <button class="btn btn-primary" onclick="startQuiz()">Try Again</button>
+        <button class="btn btn-secondary" onclick="nav('overview')">Back to Overview</button>
+      </div>
+    </div>`;
+  toast(`Test done! Score: ${pct}%`);
+}
+
+// ── Concept Quiz (fixed-length, per-topic, live mastery updates) ──
+async function loadConceptQuizOptions() {
+  if (!allConcepts.length) await loadAllConcepts();
+  const sel = $('concept-quiz-select');
+  if (sel && sel.options.length <= 1) {
+    sel.innerHTML = '<option value="">Choose a topic to quiz on…</option>' +
+      allConcepts.map(c => `<option value="${c.concept_id}">${c.name} (${c.subject})</option>`).join('');
+  }
+}
+
+async function startConceptQuiz() {
+  const conceptId = $('concept-quiz-select').value;
+  if (!conceptId) { toast('Pick a topic first'); return; }
+  const n = parseInt($('concept-quiz-count').value, 10);
+
+  $('quiz-result').style.display = 'none';
+  $('quiz-status').textContent = 'Starting topic quiz…';
+  $('quiz-status').className = 'alert alert-info';
+  try {
+    const data = await api('/api/quiz/start', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ student_id: currentStudent, concept_id: conceptId, num_questions: n })
+    });
+    conceptQuizId = data.quiz_id;
+    quizSession = null; // ensure the diagnostic-test path in submitAnswer() doesn't fire
+    $('quiz-status').style.display = 'none';
+    $('quiz-box').style.display = 'block';
+    showConceptQuizQuestion(data.question, data.question_number, data.total_questions);
+  } catch(e) { $('quiz-status').textContent = 'Error: ' + e.message; $('quiz-status').className = 'alert alert-warn'; $('quiz-status').style.display = 'block'; }
+}
+
+function showConceptQuizQuestion(q, num, total) {
+  quizQ = q;
+  quizAnswered = false;
+  $('quiz-feedback').style.display = 'none';
+  $('quiz-feedback').className = 'quiz-feedback';
+  $('quiz-next-row').innerHTML = '';
+
+  $('quiz-progress').textContent = `Topic Quiz — Question ${num} of ${total}`;
+  $('quiz-meta').innerHTML = [
+    `<span class="badge badge-blue">${q.type.replace('_',' ')}</span>`,
+    `<span class="badge badge-${q.difficulty==='easy'?'green':q.difficulty==='medium'?'yellow':'red'}">${q.difficulty}</span>`,
+    `<span class="badge badge-purple">Bloom L${q.bloom_level}</span>`,
+    `<span class="badge badge-blue">${q.points} pt${q.points>1?'s':''}</span>`
+  ].join('');
+  $('quiz-prompt').textContent = q.prompt;
+
+  const opts = $('quiz-options');
+  if (q.options && q.options.length) {
+    opts.innerHTML = q.options.map(o =>
+      `<button class="opt-btn" onclick="submitConceptQuizAnswer('${o.replace(/'/g,"\\'")}',this)">${o}</button>`
+    ).join('');
+  } else {
+    opts.innerHTML = `
+      <input id="free-ans" style="background:#1e2235;border:1px solid #374151;border-radius:8px;color:#e2e8f0;
+        padding:9px 12px;font-size:13px;width:100%;outline:none" placeholder="Type your answer…"/>
+      <button class="btn btn-primary" style="margin-top:8px" onclick="submitConceptQuizAnswer($('free-ans').value)">Submit</button>`;
+  }
+  if (q.hints && q.hints.length) {
+    opts.insertAdjacentHTML('beforeend',
+      `<button class="btn btn-secondary btn-sm" style="margin-top:8px" onclick="showHint()">💡 Hint</button>
+       <div id="hint-box" style="display:none;margin-top:8px;padding:10px;background:#1e2235;border-radius:8px;
+         font-size:12px;color:#94a3b8">${q.hints[0]}</div>`);
+  }
+}
+
+async function submitConceptQuizAnswer(answer, btn) {
+  if (quizAnswered || !conceptQuizId) return;
+  quizAnswered = true;
+
+  let data;
+  try {
+    data = await api('/api/quiz/answer', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ quiz_id: conceptQuizId, answer })
+    });
+  } catch(e) {
+    $('quiz-feedback').style.display = 'block';
+    $('quiz-feedback').className = 'quiz-feedback fb-wrong';
+    $('quiz-feedback').textContent = '❌ ' + e.message;
+    return;
+  }
+
+  if (btn) {
+    btn.classList.add(data.is_correct ? 'correct' : 'wrong');
+    document.querySelectorAll('.opt-btn').forEach(b => b.disabled = true);
+  }
+  const fb = $('quiz-feedback');
+  fb.style.display = 'block';
+  fb.className = 'quiz-feedback ' + (data.is_correct ? 'fb-correct' : 'fb-wrong');
+  fb.textContent = (data.is_correct ? '✅ ' : '❌ ') + data.feedback +
+    ` (mastery now ${Math.round(data.mastery_after*100)}% · ${data.mastery_level})`;
+
+  if (data.status === 'completed') {
+    showConceptQuizResult(data);
+    return;
+  }
+  $('quiz-next-row').innerHTML =
+    `<button class="btn btn-primary" onclick="showConceptQuizQuestion(${JSON.stringify(data.question).replace(/"/g,'&quot;')}, ${data.question_number}, ${data.total_questions})">
+      Next Question →</button>`;
+}
+
+function showConceptQuizResult(result) {
+  conceptQuizId = null;
+  $('quiz-box').style.display  = 'none';
+  $('quiz-result').style.display = 'block';
+  const col = result.percentage >= 80 ? '#4ade80' : result.percentage >= 60 ? '#fbbf24' : '#f87171';
+  $('quiz-result').innerHTML = `
+    <div class="card">
+      <div class="card-title">🎓 Topic Quiz Complete!</div>
+      <div style="text-align:center;padding:20px 0">
+        <div style="font-size:52px;font-weight:700;color:${col}">${result.percentage}%</div>
+        <div style="color:#64748b;margin-top:4px">${result.score}/${result.total} correct</div>
+        <div style="margin-top:8px">
+          <span class="badge badge-purple">Mastery now: ${Math.round(result.mastery_after*100)}% (${result.mastery_level})</span>
+        </div>
+      </div>
+      <div class="btn-row" style="margin-top:16px">
+        <button class="btn btn-secondary" onclick="nav('overview')">Back to Overview</button>
+      </div>
+    </div>`;
+  toast(`Quiz done! Score: ${result.percentage}%`);
+  loadStudentList(); // refresh topbar mastery
+}
+
+// ── Course Materials (institution notes) ──────────────────────
+async function loadMaterials() {
+  const box = $('materials-list');
+  box.textContent = 'Loading…';
+  try {
+    const data = await api('/api/materials/');
+    if (!data.files.length) { box.innerHTML = '<p style="color:#64748b;font-size:13px">No materials ingested yet.</p>'; return; }
+    box.innerHTML = data.files.map(f => `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #2d3148">
+        <div>
+          <div style="font-weight:600;font-size:13px">${f.source_file}</div>
+          <div style="font-size:11px;color:#64748b;margin-top:2px">${f.subject} · ${f.chunk_count} chunks · ${f.topics.join(', ')}</div>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="deleteMaterial('${f.source_file.replace(/'/g,"\\'")}')">🗑 Remove</button>
+      </div>`).join('') + `<div style="font-size:11px;color:#64748b;margin-top:10px">${data.total_chunks} total chunks indexed</div>`;
+  } catch(e) { box.innerHTML = `<p style="color:#f87171;font-size:13px">Error: ${e.message}</p>`; }
+}
+
+async function uploadMaterial(e) {
+  e.preventDefault();
+  const fileInput = $('mat-file');
+  if (!fileInput.files.length) { toast('Choose a file first'); return; }
+
+  const fd = new FormData();
+  fd.append('file', fileInput.files[0]);
+  fd.append('subject', $('mat-subject').value);
+  fd.append('unit', $('mat-unit').value);
+  fd.append('topic', $('mat-topic').value);
+  fd.append('difficulty', $('mat-difficulty').value);
+
+  const resultBox = $('material-upload-result');
+  resultBox.innerHTML = '<div class="alert alert-info">Uploading and ingesting…</div>';
+  try {
+    const data = await api('/api/materials/upload', { method: 'POST', body: fd });
+    resultBox.innerHTML = `<div class="alert alert-success">
+      ✅ ${data.message} — ${data.chunks_built} chunks built. Sparse index: ${data.sparse_index}.
+      Dense index: ${data.dense_index.startsWith('rebuilt') ? '✅ rebuilt' : '⚠️ ' + data.dense_index}
+    </div>`;
+    e.target.reset();
+    loadMaterials();
+    toast('Material ingested');
+  } catch(err) {
+    resultBox.innerHTML = `<div class="alert alert-warn">❌ ${err.message}</div>`;
+  }
+}
+
+async function deleteMaterial(filename) {
+  if (!confirm(`Remove "${filename}" and re-ingest remaining materials?`)) return;
+  try {
+    await api(`/api/materials/${encodeURIComponent(filename)}`, { method: 'DELETE' });
+    toast('Removed');
+    loadMaterials();
+  } catch(e) { toast('Error: ' + e.message); }
+}
+
+// ── Department Analytics ───────────────────────────────────────
+async function loadDepartments() {
+  try {
+    const data = await api('/api/department/');
+    const sel = $('dept-select');
+    sel.innerHTML = data.departments.map(d =>
+      `<option value="${d.department}">${d.department} (${d.student_count} students, ${d.avg_mastery}% avg)</option>`
+    ).join('');
+    if (data.departments.length) loadDepartmentDetail();
+  } catch(e) { toast('Error loading departments: ' + e.message); }
+}
+
+async function loadDepartmentDetail() {
+  const dept = $('dept-select').value;
+  if (!dept) return;
+
+  try {
+    const [overview, concepts, roster] = await Promise.all([
+      api(`/api/department/${encodeURIComponent(dept)}/overview`),
+      api(`/api/department/${encodeURIComponent(dept)}/concepts`),
+      api(`/api/department/${encodeURIComponent(dept)}/students`),
+    ]);
+
+    $('dept-summary').innerHTML = [
+      ['Students',        overview.student_count],
+      ['Avg Mastery',     overview.avg_mastery + '%'],
+      ['Total Sessions',  overview.total_sessions],
+      ['Sessions/Student',overview.avg_sessions_per_student]
+    ].map(([l,v]) => `<div class="stat-tile"><div class="val">${v}</div><div class="lbl">${l}</div></div>`).join('');
+
+    const d = overview.mastery_distribution;
+    const distColors = { struggling:'#f87171', developing:'#fbbf24', proficient:'#60a5fa', mastered:'#4ade80' };
+    $('dept-distribution').innerHTML = Object.entries(d).map(([label, count]) =>
+      `<div class="stat-tile"><div class="val" style="color:${distColors[label]}">${count}</div>
+       <div class="lbl">${label.charAt(0).toUpperCase()+label.slice(1)}</div></div>`
+    ).join('');
+
+    $('dept-concepts').innerHTML = concepts.concepts.length ? concepts.concepts.slice(0, 10).map(c => `
+      <div class="prog-wrap">
+        <div class="prog-label"><span>${c.concept_name}${c.subject ? ' · '+c.subject : ''}</span><span>${c.avg_mastery}%</span></div>
+        <div class="prog-bar"><div class="prog-fill ${c.avg_mastery<50?'red':c.avg_mastery<75?'yellow':'green'}" style="width:${c.avg_mastery}%"></div></div>
+        <div style="font-size:11px;color:#64748b">${c.students_attempted} student(s) attempted</div>
+      </div>`).join('') : '<p style="font-size:13px;color:#64748b">No concept attempts recorded yet in this department.</p>';
+
+    $('dept-roster').innerHTML = `
+      <table class="data-table"><thead><tr><th>Student</th><th>Mastery</th><th>Concepts</th><th>Sessions</th></tr></thead>
+      <tbody>${roster.students.map(s => {
+        const color = s.overall_mastery >= 80 ? '#4ade80' : s.overall_mastery >= 60 ? '#fbbf24' : '#f87171';
+        return `<tr>
+          <td><strong>${s.name}</strong><br/><span style="font-size:11px;color:#64748b">${s.student_id}</span></td>
+          <td><span style="color:${color}">${s.overall_mastery}%</span></td>
+          <td>${s.concepts_mastered}</td>
+          <td>${s.total_sessions}</td>
+        </tr>`;
+      }).join('')}</tbody></table>`;
+  } catch(e) { toast('Error loading department detail: ' + e.message); }
+}
+
+// ── My Concepts ──────────────────────────────────────────────
+async function loadConceptsView() {
+  try {
+    const data = await api(`/api/dashboard/student/${currentStudent}/concepts`);
+    studentConcepts = data.concepts;
+    // Populate unit filter
+    const units = [...new Set(studentConcepts.map(c => c.unit))];
+    $('filter-unit').innerHTML = '<option value="">All units</option>' +
+      units.map(u => `<option>${u}</option>`).join('');
+    renderConcepts();
+  } catch(e) { toast('Error: ' + e.message); }
+}
+
+function renderConcepts() {
+  const levelFilter = $('filter-level').value;
+  const unitFilter  = $('filter-unit').value;
+  const filtered    = studentConcepts.filter(c =>
+    (!levelFilter || c.mastery_level === levelFilter) &&
+    (!unitFilter  || c.unit === unitFilter)
+  );
+  const col = pct => pct >= 85 ? '#4ade80' : pct >= 70 ? '#60a5fa' : pct >= 50 ? '#fbbf24' : '#f97316';
+  $('concepts-grid').innerHTML = filtered.length ? filtered.map(c => `
+    <div class="concept-pill border-${c.mastery_level.toLowerCase()}"
+         onclick="selectConceptForTutor('${c.concept_id}','${c.name}')">
+      <div class="cp-name">${masteryEmoji(c.mastery_level)} ${c.name}</div>
+      <div class="cp-meta">
+        <span class="diff-${c.difficulty}">${c.difficulty}</span>
+        <span>${c.unit}</span>
+        <span>${c.attempts} attempts</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:11px;margin-top:6px">
+        <span class="m-${c.mastery_level.toLowerCase()}">${c.mastery_level.replace('_',' ')}</span>
+        <span style="color:#94a3b8">${c.mastery_pct}%</span>
+      </div>
+      <div class="cp-bar"><div class="cp-fill" style="width:${c.mastery_pct}%;background:${col(c.mastery_pct)}"></div></div>
+    </div>`).join('') : '<p style="color:#64748b;font-size:13px">No concepts match filter.</p>';
+}
+
+function selectConceptForTutor(id, name) {
+  nav('tutor');
+  setTimeout(() => {
+    $('tutor-concept').value = id;
+    $('chat-input').value = `Explain ${name}`;
+    sendQuestion();
+  }, 200);
+}
+
+// ── Gap Analysis ─────────────────────────────────────────────
+async function loadGapConcepts() {
+  if (!allConcepts.length) await loadAllConcepts();
+  $('gap-concept-select').innerHTML = '<option value="">— Overall gaps —</option>' +
+    allConcepts.map(c => `<option value="${c.concept_id}">${c.name}</option>`).join('');
+}
+
+async function loadGaps() {
+  const cid = $('gap-concept-select').value;
+  const url = cid
+    ? `/api/dashboard/student/${currentStudent}/gaps?concept_id=${cid}`
+    : `/api/dashboard/student/${currentStudent}/gaps`;
+  try {
+    $('gaps-output').innerHTML = '<div class="spin" style="margin:16px auto;display:block;width:24px;height:24px;border-width:3px"></div>';
+    const data = await api(url);
+    const gaps = data.gaps;
+    if (!gaps.length) {
+      $('gaps-output').innerHTML = '<div class="alert alert-success">No significant gaps detected! Keep going.</div>';
+      return;
+    }
+    $('gaps-output').innerHTML = gaps.map(g => {
+      const sev = g.severity > 0.7 ? 'high' : g.severity > 0.4 ? 'med' : 'low';
+      return `<div class="gap-item sev-${sev}">
+        <div class="gap-title">${g.concept_name}
+          <span class="badge badge-${sev==='high'?'red':sev==='med'?'yellow':'blue'}" style="margin-left:8px;font-size:10px">
+            ${g.gap_type.replace('_',' ')} · severity ${Math.round(g.severity*100)}%</span>
+        </div>
+        <div class="prog-bar" style="margin:6px 0"><div class="prog-fill red" style="width:${Math.round(g.current_mastery*100)}%"></div></div>
+        <div class="gap-meta">
+          <span>Current: ${Math.round(g.current_mastery*100)}%</span>
+          <span>Required: ${Math.round(g.required_mastery*100)}%</span>
+          <span>⏱ ${g.estimated_remediation_time} min to fix</span>
+        </div>
+        <div style="font-size:12px;color:#94a3b8;margin-top:6px">💡 ${g.recommended_action}</div>
+        ${g.blocking_concepts.length ? `<div style="font-size:11px;color:#64748b;margin-top:4px">Blocks: ${g.blocking_concepts.join(', ')}</div>` : ''}
+      </div>`;
+    }).join('');
+  } catch(e) { $('gaps-output').innerHTML = '<div class="alert alert-warn">Error: ' + e.message + '</div>'; }
+}
+
+// ── Learning Path ────────────────────────────────────────────
+async function loadPathTargets() {
+  if (!allConcepts.length) await loadAllConcepts();
+  $('path-target-select').innerHTML = '<option value="">Choose target concept…</option>' +
+    allConcepts.map(c => `<option value="${c.concept_id}">${c.name}</option>`).join('');
+}
+
+async function loadPath() {
+  const cid = $('path-target-select').value;
+  if (!cid) { toast('Please select a target concept'); return; }
+
+  // Build mastered list from student concepts
+  const mastered = studentConcepts.filter(c => c.mastery_level === 'MASTERED' || c.mastery_level === 'PROFICIENT').map(c => c.concept_id).join(',');
+
+  try {
+    $('path-output').innerHTML = '<div class="spin" style="margin:16px auto;display:block;width:24px;height:24px;border-width:3px"></div>';
+    const data = await api(`/api/knowledge/concepts/${cid}/path?mastered=${mastered}`);
+
+    if (!data.missing_steps.length) {
+      $('path-output').innerHTML = '<div class="alert alert-success">🎉 You are already ready for <strong>' + data.target + '</strong>!</div>';
+      return;
+    }
+
+    $('path-output').innerHTML = `
+      <div class="alert alert-info" style="margin-bottom:12px">
+        Path to <strong>${data.target}</strong> · ${data.missing_steps.length} steps · ~${data.total_minutes} min total
+      </div>
+      <div style="position:relative;padding-left:24px">
+        ${data.missing_steps.map((s, i) => `
+          <div style="position:relative;margin-bottom:12px">
+            <div style="position:absolute;left:-24px;top:10px;width:16px;height:16px;border-radius:50%;
+              background:#312e81;border:2px solid #818cf8;display:flex;align-items:center;
+              justify-content:center;font-size:9px;color:#a5b4fc;font-weight:700">${i+1}</div>
+            ${i < data.missing_steps.length-1 ? `<div style="position:absolute;left:-17px;top:26px;
+              width:2px;height:calc(100% + 4px);background:#2d3148"></div>` : ''}
+            <div class="concept-pill" style="margin-left:0">
+              <div class="cp-name">${s.name}</div>
+              <div class="cp-meta">
+                <span class="diff-${s.difficulty}">${s.difficulty}</span>
+                <span>⏱ ${s.estimated_minutes} min</span>
+              </div>
+            </div>
+          </div>`).join('')}
+      </div>`;
+  } catch(e) { $('path-output').innerHTML = '<div class="alert alert-warn">Error: ' + e.message + '</div>'; }
+}
+
+// ── Teacher View ─────────────────────────────────────────────
+async function loadTeacher() {
+  try {
+    const data = await api('/api/dashboard/teacher');
+    // Stats
+    $('teacher-stats').innerHTML = [
+      ['Total Students', data.total_students],
+      ['Active (7d)',     data.active_students],
+      ['Avg Mastery',    fmt(data.average_mastery*100) + '%'],
+      ['Concepts Taught',data.concepts_taught]
+    ].map(([l,v]) => `<div class="stat-tile"><div class="val">${v}</div><div class="lbl">${l}</div></div>`).join('');
+
+    // Student table
+    const students = await api('/api/students/');
+    $('class-tbody').innerHTML = students.map(s => {
+      const pct = s.overall_mastery;
+      const color = pct >= 80 ? '#4ade80' : pct >= 60 ? '#fbbf24' : '#f87171';
+      const badge = pct >= 80 ? 'badge-green' : pct >= 60 ? 'badge-yellow' : 'badge-red';
+      return `<tr>
+        <td><strong>${s.name}</strong><br/><span style="font-size:11px;color:#64748b">${s.student_id}</span></td>
+        <td>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div style="flex:1;height:6px;background:#1e2235;border-radius:3px;overflow:hidden">
+              <div style="width:${pct}%;height:100%;background:${color};border-radius:3px"></div>
+            </div>
+            <span style="font-size:12px;color:${color}">${pct}%</span>
+          </div>
+        </td>
+        <td><span style="color:#94a3b8">${s.concepts_mastered}</span></td>
+        <td><span class="badge ${badge}">${pct>=80?'Excelling':pct>=60?'On Track':'Needs Help'}</span></td>
+      </tr>`;
+    }).join('');
+
+    // Challenging concepts
+    const ch = data.challenging_concepts || [];
+    $('challenging-concepts').innerHTML = ch.length
+      ? ch.map(c => `<div class="prog-wrap">
+          <div class="prog-label"><span>${c.concept_name}</span><span>${fmt(c.average_mastery*100)}%</span></div>
+          <div class="prog-bar"><div class="prog-fill red" style="width:${fmt(c.average_mastery*100)}%"></div></div>
+          <div style="font-size:11px;color:#64748b">${c.students_attempted} students attempted</div>
+        </div>`).join('')
+      : '<p style="font-size:13px;color:#64748b">Not enough data yet.</p>';
+
+    const wu = data.well_understood_concepts || [];
+    $('well-understood').innerHTML = wu.length
+      ? wu.map(c => `<div class="prog-wrap">
+          <div class="prog-label"><span>${c.concept_name}</span><span>${fmt(c.average_mastery*100)}%</span></div>
+          <div class="prog-bar"><div class="prog-fill green" style="width:${fmt(c.average_mastery*100)}%"></div></div>
+        </div>`).join('')
+      : '<p style="font-size:13px;color:#64748b">Not enough data yet.</p>';
+
+  } catch(e) { console.error(e); toast('Error loading teacher view: ' + e.message); }
+}
+
+// ── Interventions ────────────────────────────────────────────
+async function loadInterventions() {
+  try {
+    $('interventions-output').innerHTML = '<div class="spin" style="margin:16px auto;display:block;width:24px;height:24px;border-width:3px"></div>';
+    const data = await api('/api/dashboard/teacher/interventions');
+    const items = data.interventions;
+
+    if (!items.length) {
+      $('interventions-output').innerHTML = '<div class="alert alert-success">No interventions needed. All students are on track!</div>';
+      return;
+    }
+
+    $('interventions-output').innerHTML = items.map(item => `
+      <div class="card" style="margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
+          <strong style="font-size:14px">${item.student_name}</strong>
+          <span class="badge badge-blue">${item.recommendations.length} recommendation(s)</span>
+        </div>
+        ${item.recommendations.map(r => `
+          <div style="background:#252840;border-radius:8px;padding:12px;margin-bottom:8px;
+                      border-left:3px solid ${r.priority==='high'?'#f87171':r.priority==='medium'?'#fbbf24':'#60a5fa'}">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+              <strong style="font-size:13px">${r.title}</strong>
+              <span class="badge badge-${r.priority==='high'?'red':r.priority==='medium'?'yellow':'blue'}">${r.priority}</span>
+            </div>
+            <div style="font-size:12px;color:#94a3b8;margin-bottom:8px">${r.reason}</div>
+            <ul style="font-size:12px;color:#64748b;padding-left:18px">
+              ${r.actions.map(a=>`<li>${a}</li>`).join('')}
+            </ul>
+          </div>`).join('')}
+      </div>`).join('');
+  } catch(e) { $('interventions-output').innerHTML = '<div class="alert alert-warn">Error: ' + e.message + '</div>'; }
+}
+
+// ── Knowledge Graph ───────────────────────────────────────────
+async function loadGraph() {
+  try {
+    if (!graphData) {
+      graphData = await api('/api/knowledge/graph');
+    }
+    renderGraph(graphData);
+  } catch(e) { toast('Graph error: ' + e.message); }
+}
+
+function renderGraph(data) {
+  const canvas = $('kg-canvas');
+  const W = canvas.clientWidth || 700;
+  const H = canvas.clientHeight || 420;
+
+  // Position nodes in layers by unit
+  const units = [...new Set(data.nodes.map(n => n.unit))].sort();
+  const layerW = W / (units.length + 1);
+  const positions = {};
+
+  units.forEach((unit, ui) => {
+    const unitNodes = data.nodes.filter(n => n.unit === unit);
+    const layerH    = H / (unitNodes.length + 1);
+    unitNodes.forEach((n, ni) => {
+      positions[n.id] = {
+        x: layerW * (ui + 1),
+        y: layerH * (ni + 1)
+      };
+    });
+  });
+
+  const diffColor = { easy:'#22c55e', medium:'#f59e0b', hard:'#ef4444' };
+  const diffBg    = { easy:'#14532d', medium:'#713f12', hard:'#7f1d1d' };
+
+  // Build SVG for edges
+  const svgLines = data.edges
+    .filter(e => e.type === 'prerequisite' && positions[e.from] && positions[e.to])
+    .map(e => {
+      const f = positions[e.from], t = positions[e.to];
+      const opacity = e.strength > 0.7 ? '0.7' : '0.35';
+      // Simple curved arrow
+      const mx = (f.x + t.x) / 2;
+      const my = (f.y + t.y) / 2 - 20;
+      return `<path d="M${f.x},${f.y} Q${mx},${my} ${t.x},${t.y}"
+        stroke="#818cf8" stroke-width="${e.strength > 0.7 ? 2 : 1}" fill="none"
+        stroke-opacity="${opacity}" marker-end="url(#arr)"/>`;
+    }).join('');
+
+  const svgHtml = `
+    <svg class="kg-svg" viewBox="0 0 ${W} ${H}">
+      <defs>
+        <marker id="arr" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+          <path d="M0,0 L0,6 L8,3 z" fill="#818cf8" fill-opacity="0.7"/>
+        </marker>
+      </defs>
+      ${svgLines}
+    </svg>`;
+
+  // HTML nodes
+  const nodesHtml = data.nodes.map(n => {
+    const pos = positions[n.id];
+    if (!pos) return '';
+    return `<div class="kg-node"
+      style="left:${pos.x - 50}px;top:${pos.y - 22}px;
+             background:${diffBg[n.difficulty]};
+             color:${diffColor[n.difficulty]};
+             border-color:${diffColor[n.difficulty]}"
+      title="${n.name} · ${n.difficulty} · ${n.unit}"
+      onclick="selectConceptForTutor('${n.id}','${n.label}')">
+      ${n.label}
+    </div>`;
+  }).join('');
+
+  canvas.innerHTML = svgHtml + nodesHtml;
+}
+
+// ── Enroll Student ────────────────────────────────────────────
+async function enrollStudent(e) {
+  e.preventDefault();
+  const body = {
+    student_id: $('en-id').value.trim(),
+    name: $('en-name').value.trim(),
+    email: $('en-email').value.trim(),
+    grade_level: $('en-grade').value.trim() || null,
+    institution: $('en-institution').value.trim() || null,
+    attendance_percentage: $('en-attendance').value ? +$('en-attendance').value : null,
+    learning_style_survey: {
+      visual_score: +$('en-vis').value,
+      auditory_score: +$('en-aud').value,
+      reading_writing_score: +$('en-rw').value,
+      kinesthetic_score: +$('en-kin').value,
+      pace_preference: $('en-pace').value
+    }
+  };
+  try {
+    const data = await api('/api/students/', {
+      method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body)
+    });
+    $('enroll-result').innerHTML = `<div class="alert alert-success">
+      ✅ Student <strong>${body.name}</strong> enrolled! ID: ${data.student_id}</div>`;
+    toast('Student enrolled!');
+    await loadStudentList();
+  } catch(e) {
+    $('enroll-result').innerHTML = `<div class="alert alert-warn">❌ ${e.message}</div>`;
+  }
+}
+
+// ── Institution Student Dataset Import ────────────────────────
+async function importStudentDataset(e) {
+  e.preventDefault();
+  const fileInput = $('dataset-file');
+  if (!fileInput.files.length) { toast('Choose a dataset first'); return; }
+
+  const fd = new FormData();
+  fd.append('file', fileInput.files[0]);
+  fd.append('institution', $('dataset-institution').value.trim());
+  fd.append('department', $('dataset-department').value.trim());
+  fd.append('class_name', $('dataset-class').value.trim());
+
+  const resultBox = $('dataset-import-result');
+  resultBox.innerHTML = '<div class="alert alert-info">Uploading and enrolling students…</div>';
+
+  try {
+    const data = await api('/api/students/import-dataset', {
+      method: 'POST',
+      body: fd
+    });
+
+    const errors = data.error_count
+      ? `<div style="margin-top:8px;color:#fbbf24">⚠️ ${data.error_count} rows had errors.</div>`
+      : '';
+
+    resultBox.innerHTML = `<div class="alert alert-success">
+      ✅ Dataset processed: <strong>${data.created_count}</strong> students enrolled,
+      <strong>${data.skipped_count}</strong> skipped,
+      <strong>${data.error_count}</strong> errors.${errors}
+    </div>`;
+
+    e.target.reset();
+    await loadStudentList();
+    await loadDepartments();
+    toast(`${data.created_count} students enrolled from dataset`);
+  } catch(err) {
+    resultBox.innerHTML = `<div class="alert alert-warn">❌ ${err.message}</div>`;
+  }
+}
+
+// ── Shared helpers ────────────────────────────────────────────
+async function loadAllConcepts() {
+  try {
+    const data = await api('/api/knowledge/concepts');
+    allConcepts = data.concepts;
+  } catch(e) { console.error(e); }
+}
+
+// ── Boot ──────────────────────────────────────────────────────
+async function boot() {
+  await Promise.all([loadStudentList(), loadAllConcepts()]);
+  loadOverview();
+  // Background: load student concepts for filters
+  try {
+    const data = await api(`/api/dashboard/student/${currentStudent}/concepts`);
+    studentConcepts = data.concepts;
+  } catch(_) {}
+}
+
+boot();
+</script>
+</body>
+</html>

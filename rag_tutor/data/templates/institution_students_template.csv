@@ -1,0 +1,4 @@
+student_id,name,email,institution,department,class_name,grade_level,exam_marks,attendance_percentage
+STU001,Arun Kumar,arun@example.edu,ABC College,Computer Science,CSE-A,Year 2,78,86
+STU002,Divya Raj,divya@example.edu,ABC College,Computer Science,CSE-A,Year 2,64,91
+STU003,Kavin S,kavin@example.edu,ABC College,Computer Science,CSE-B,Year 2,42,73
